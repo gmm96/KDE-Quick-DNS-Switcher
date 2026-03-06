@@ -4,8 +4,7 @@
         "ipv4_2": "1.0.0.1",
         "ipv6_1": "2606:4700:4700::1111",
         "ipv6_2": "2606:4700:4700::1001",
-        "icon": "cloudflare.svg",
-        "manual": true
+        "icon": "cloudflare.svg"
     },
     "Google": {
         "ipv4_1": "8.8.8.8",

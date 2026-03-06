@@ -18,9 +18,9 @@ from PyQt6.QtCore import QObject, pyqtSlot
 
 # region Constants
 
-DIR = os.path.dirname(os.path.realpath(__file__))
-JSON = os.path.join(DIR, "dns-providers.json")
-ICONS = os.path.join(DIR, "icons")
+PROJECT_DIR = os.path.dirname(os.path.realpath(__file__))
+CONFIG_FILE = os.path.join(PROJECT_DIR, "dns-providers.json")
+ICON_DIR = os.path.join(PROJECT_DIR, "icons")
 APP_ID = "quick_dns_switcher"
 APP_NAME = "Quick DNS switcher"
 DIALOG_ERROR_TITLE = f"Error - {APP_NAME}"
@@ -34,7 +34,6 @@ DEFAULT_MODE_ICON = "network-server"
 
 
 class NetworkMonitor(QObject):
-
     def __init__(self):
         super().__init__()
         self.timer = QTimer()
@@ -52,26 +51,26 @@ def display_error_dialog(content):
     QMessageBox.critical(None, DIALOG_ERROR_TITLE, content)
 
 
+def load_dns_providers():
+    if not os.path.exists(CONFIG_FILE):
+        display_error_dialog(f"DNS configuration file not found:\n\n{CONFIG_FILE}")
+        sys.exit(1)
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        display_error_dialog(f"Invalid JSON format in DNS configuration file:\n\n{CONFIG_FILE}\n\n{e}")
+        sys.exit(1)
+    except Exception as e:
+        display_error_dialog(f"Unexpected error loading DNS configuration file:\n\n{e}")
+        sys.exit(1)
+
+
 def execute_command(args, output=True, raise_error=True):
     try:
         return subprocess.run(args, capture_output=output, text=True, check=raise_error)
     except subprocess.CalledProcessError as e:
         display_error_dialog(f"Error executing command:\n\n{' '.join(args)}\n\n{e}")
-        sys.exit(1)
-
-
-def load_dns_providers():
-    if not os.path.exists(JSON):
-        display_error_dialog(f"DNS configuration file not found:\n\n{JSON}")
-        sys.exit(1)
-    try:
-        with open(JSON, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError as e:
-        display_error_dialog(f"Invalid JSON format in DNS configuration file:\n\n{JSON}\n\n{e}")
-        sys.exit(1)
-    except Exception as e:
-        display_error_dialog(f"Unexpected error loading DNS configuration file:\n\n{e}")
         sys.exit(1)
 
 
@@ -97,7 +96,7 @@ def get_active_connections_with_dns():
                 
             if line.startswith("GENERAL.CONNECTION:"):
                 # Guarda el bloque anterior antes de empezar uno nuevo
-                if name and device and device not in ("lo", ""):
+                if name and device and device not in ("lo", "tun0", ""):
                     conns.append((name, device, ipv4.copy(), ipv6.copy()))
                 
                 name = line.split(":", 1)[1].strip()
@@ -116,7 +115,7 @@ def get_active_connections_with_dns():
                     ipv6.append(ip)
 
         # Añade el último bloque al finalizar el bucle
-        if name and device and device not in ("lo", ""):
+        if name and device and device not in ("lo", "tun0", ""):
             conns.append((name, device, ipv4.copy(), ipv6.copy()))
 
     except Exception:
@@ -138,8 +137,8 @@ def get_current_dns():
 
 def set_dns(ipv4_list, ipv6_list):
     print("SET DNS:", ipv4_list, ipv6_list)
-    v4 = " ".join(ipv4_list)
-    v6 = " ".join(ipv6_list)
+    v4 = ",".join(ipv4_list)
+    v6 = ",".join(ipv6_list)
     connections = get_active_connections_with_dns()
     for name, device, current_v4, current_v6 in connections:
         if set(current_v4) == set(ipv4_list) and set(current_v6) == set(ipv6_list):
@@ -204,7 +203,7 @@ def update_state():
         auto_action.setText(AUTO_MODE_NAME)
         if active and active in DNS_PROVIDERS:
             icon_name = DNS_PROVIDERS[active].get("icon")
-            icon_file = os.path.join(ICONS, icon_name)
+            icon_file = os.path.join(ICON_DIR, icon_name)
             if icon_name and os.path.exists(icon_file):
                 tray.setIcon(QIcon(icon_file))
             else:
@@ -214,25 +213,25 @@ def update_state():
 
     # Notify if changed
     all_ips = current_dns["ipv4"] + current_dns["ipv6"]
-    dns_list_str = "\n".join(all_ips) if all_ips else "-"
     if last_dns is not None and current_dns != last_dns:
-        msg = [f"DNS changed to {active}."]
+        msg = [f"DNS changed to {active}.\n \n"]
+        #msg = []
         if all_ips:
-            msg.append(dns_list_str)
+            all_ips_formatted = [f" • <i>{ip}</i>" for ip in all_ips]
+            msg.append("\n".join(all_ips_formatted))
         icon_file = icon_file if icon_file else AUTO_MODE_ICON
-        execute_command(["notify-send", "-i", icon_file, APP_NAME, "\n".join(msg)])
+        #execute_command(["notify-send", "-a", APP_NAME, "-i", icon_file, APP_NAME, "\n".join(msg)])
+        #execute_command(["notify-send", "-a", APP_NAME, "-i", icon_file, "-t", "5000", active, "\n".join(msg)])
+        execute_command(["notify-send", "-a", APP_NAME, "-i", icon_file, "-t", "5000", f"{active} DNS", "\n".join(msg)])
     last_dns = current_dns
 
     # Update tooltip
     tooltip = (
         f"{APP_NAME}\n"
-        f"------------------------------\n"
-        f"• Server: {active}\n"
-        f"------------------------------\n"
-        f"• IPv4:\n"
+        f"——————————\n"
+        f"{active}\n\n"
         f"{'\n'.join(current_dns["ipv4"])}\n"
-        f"• IPv6:\n"
-        f"{'\n'.join(current_dns["ipv6"])}\n"
+        f"{'\n'.join(current_dns["ipv6"])}"
     )
     tray.setToolTip(tooltip)
 
@@ -269,7 +268,7 @@ def ensure_single_instance():
 
 def open_config():
     editor = os.environ.get("EDITOR", "xdg-open")
-    subprocess.Popen([editor, JSON])
+    subprocess.Popen([editor, CONFIG_FILE])
 
 
 def restart_app():
@@ -286,19 +285,17 @@ def restart_app():
 # region App
 
 last_dns = None
+DNS_PROVIDERS = load_dns_providers()
 app = QApplication(sys.argv)
 app.server = ensure_single_instance()
 tray = QSystemTrayIcon()
 menu = QMenu()
 actions = {}
-DNS_PROVIDERS = load_dns_providers()
 monitor_network_changes()
 
 
 # Menu structure
-menu.addSection("ESTADO DEL SISTEMA")
-
-title_action = QAction(APP_NAME.upper())
+title_action = QAction(APP_NAME)
 title_action.setEnabled(False)
 menu.addAction(title_action)
 
@@ -314,7 +311,7 @@ for name in sorted(DNS_PROVIDERS.keys()):
     data = DNS_PROVIDERS[name]
     ipv4, ipv6 = get_provider_dns(data)
     icon_name = data.get("icon")
-    icon_file = os.path.join(ICONS, icon_name)
+    icon_file = os.path.join(ICON_DIR, icon_name)
     if icon_name and os.path.exists(icon_file):
         action = QAction(QIcon(icon_file), name)
     else:
@@ -325,7 +322,7 @@ for name in sorted(DNS_PROVIDERS.keys()):
 
 menu.addSeparator()
 
-options_title_action = QAction("OPTIONS")
+options_title_action = QAction("Options")
 options_title_action.setEnabled(False)
 menu.addAction(options_title_action)
 
