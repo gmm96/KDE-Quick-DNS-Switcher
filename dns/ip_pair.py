@@ -24,3 +24,15 @@ class IpPair:
         ip_address = ipaddress.ip_address(ip)
         if ip_address.version != self.version:
             raise ValueError
+
+    def get_ip_list(self) -> List[str]:
+        return [ip for ip in (self.main, self.alternative) if ip]
+
+    def __eq__(self, other: IpPair):
+        if self is other:
+            return True
+        if not isinstance(other, IpPair):
+            raise False
+        return self.version == other.version and \
+                self.main == other.main and \
+                self.alternative == other.alternative
