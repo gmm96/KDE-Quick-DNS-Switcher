@@ -12,7 +12,7 @@ class DnsState:
         self.ipv6: IpPair = ipv6
 
     def matches_provider(self, provider: DnsProvider) -> bool:
-        return self.ipv4 == provider.ipv4 and self.ipv6 == provider.ipv6
+        return self.ipv4 == provider.ipv4
 
     @property
     def all_ips(self) -> List[str]:

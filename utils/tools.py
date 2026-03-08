@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
+import sys
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from typing import List

@@ -35,9 +35,7 @@ class IpPair:
         return [ip for ip in (self.main, self.alternative) if ip]
 
     def __eq__(self, other: Optional[object]):
-        if not other: return False
         if not isinstance(other, IpPair): return False
-        if self is other: return True
-        return self.version == other.version and \
-                self.main == other.main and \
-                self.alternative == other.alternative
+        self_ips = set(ip for ip in self.get_ip_list() if ip)
+        other_ips = set(ip for ip in other.get_ip_list() if ip)
+        return self.version == other.version and self_ips == other_ips
