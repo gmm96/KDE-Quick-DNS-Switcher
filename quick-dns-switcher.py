@@ -4,11 +4,6 @@
 import sys
 import subprocess
 import os
-import json
-import signal
-import ipaddress
-import socket
-import struct
 import logging
 from typing import Optional, List, Dict
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
@@ -114,7 +109,7 @@ def set_dns(target_v4: IpPair, target_v6: IpPair):
         ])
         result_reapply = execute_command(["nmcli", "device", "reapply", conn.device], True, False)
         if result_reapply.returncode != 0:
-            logging.warning("Error reseting network, trying aggresive method...", stack_info=True)
+            logging.warning("Error resetting network, trying aggressive method...", stack_info=True)
             result_up = execute_command(["nmcli", "connection", "up", conn.name], True, True)
 
     QTimer.singleShot(500, update_state)
@@ -128,23 +123,33 @@ def make_set_dns_action(ipv4: IpPair, ipv6: IpPair):
 
 def update_state():
     global last_dns_ips
-    state = get_current_dns()
-    active_name = Constants.AUTO_MODE_NAME
-    
-    for provider in dns_config.get_all():
-        if state.matches_provider(provider):
-            active_name = provider.name
-            break
-    
+    connections: List[NetworkConnection] = get_active_connections_with_dns()
+    dns_state: DnsState = DnsState.from_network_connections(connections)
+
+    active_name: str = "Custom DNS"
+    if not dns_state.ipv4_ignore_auto_dns and not dns_state.ipv6_ignore_auto_dns:
+        active_name = Constants.AUTO_MODE_NAME
+    else:
+        for dns_provider in dns_config.get_all():
+            if dns_state.matches_provider(dns_provider):
+                active_name = dns_provider.name
+                break
+
     # Tray icon
-    provider_obj = dns_config.get_by_name(active_name)
+    active_provider = dns_config.get_by_name(active_name)
     if active_name == Constants.AUTO_MODE_NAME:
         tray.setIcon(QIcon.fromTheme(Constants.AUTO_MODE_ICON))
-    elif provider_obj and provider_obj.icon:
-        icon_path = os.path.join(ICON_DIR, provider_obj.icon)
-        tray.setIcon(QIcon(icon_path) if os.path.exists(icon_path) else QIcon.fromTheme(Constants.DEFAULT_MODE_ICON))
+    elif active_provider and active_provider.icon:
+        if active_provider.icon_from_theme:
+            tray.setIcon(QIcon.fromTheme(active_provider.icon))
+        else:
+            icon_path = os.path.join(ICON_DIR, active_provider.icon)
+            if os.path.exists(icon_path):
+                tray.setIcon(QIcon(icon_path))
+            else:
+                tray.setIcon(QIcon.fromTheme(Constants.CUSTOM_MODE_ICON))
     else:
-        tray.setIcon(QIcon.fromTheme(Constants.DEFAULT_MODE_ICON))
+        tray.setIcon(QIcon.fromTheme(Constants.CUSTOM_MODE_ICON))
 
     # Menu items
     auto_action.setText(f"✔ {Constants.AUTO_MODE_NAME}" if active_name == Constants.AUTO_MODE_NAME else Constants.AUTO_MODE_NAME)
@@ -152,11 +157,11 @@ def update_state():
         action.setText(f"✔ {name}" if name == active_name else name)
 
     # Notification
-    current_ips = state.all_ips
+    current_ips = dns_state.all_ips
     if last_dns_ips is not None and set(current_ips) != set(last_dns_ips):
         icon = "network-server"
-        if provider_obj and provider_obj.icon:
-            icon = os.path.join(ICON_DIR, provider_obj.icon)
+        if active_provider and active_provider.icon:
+            icon = os.path.join(ICON_DIR, active_provider.icon)
         body = "\n".join(current_ips) if current_ips else "System Default"
         execute_command(["notify-send", "-a", Constants.APP_NAME, "-t", "5000", "-i", icon, active_name, body], False, False)
     last_dns_ips = current_ips
@@ -211,7 +216,7 @@ for provider in sorted(dns_config.get_all(), key=lambda x: x.name):
     if provider.icon and os.path.exists(icon_path):
         q_icon = QIcon(icon_path)
     else:
-        q_icon = QIcon.fromTheme(Constants.DEFAULT_MODE_ICON)
+        q_icon = QIcon.fromTheme(Constants.CUSTOM_MODE_ICON)
     action.setIcon(q_icon)
     menu.addAction(action)
     provider_actions[provider.name] = action
@@ -234,7 +239,7 @@ exit_action = QAction(QIcon.fromTheme("exit"), "Exit")
 exit_action.triggered.connect(app.quit)
 menu.addAction(exit_action)
 
-tray.setIcon(QIcon.fromTheme(Constants.DEFAULT_MODE_ICON))
+tray.setIcon(QIcon.fromTheme(Constants.CUSTOM_MODE_ICON))
 tray.setContextMenu(menu)
 tray.show()
 update_state()
