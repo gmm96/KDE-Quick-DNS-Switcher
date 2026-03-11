@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Optional
 from network.ip_pair import IpPair
 
 
@@ -18,7 +17,7 @@ class NetworkConnection:
         self.ipv4_ignore_auto_dns = ignore_ipv4
         self.ipv6_ignore_auto_dns = ignore_ipv6
 
-    def parse_ignore_auto_dns(self, value_ipv4: str, value_ipv6: str):
+    def parse_ignore_auto_dns(self, value_ipv4: str, value_ipv6: str) -> None:
         ipv4_new_value, ipv6_new_value = False, False
         if "yes" == value_ipv4:
             ipv4_new_value = True
