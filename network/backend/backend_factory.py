@@ -10,7 +10,7 @@ class BackendFactory:
 
     @staticmethod
     def create() -> NetworkBackendBase:
-        if shutil.which("nmcli"):
+        if shutil.which(str("nmcli")):
             return NetworkManagerBackend()
 
         raise RuntimeError("Unsupported system")

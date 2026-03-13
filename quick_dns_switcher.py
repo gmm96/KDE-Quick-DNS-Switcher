@@ -4,7 +4,6 @@
 import sys
 import subprocess
 import os
-import uuid
 from typing import Dict, Callable, Any, List, Optional
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
@@ -16,6 +15,7 @@ from network.dns_state import DnsState
 from network.ip_pair import IpPair
 from network.dns_configuration import DnsConfiguration
 from network.network_connection import NetworkConnection
+from utils.tools import execute_command
 
 
 class QuickDnsSwitcher:
@@ -34,7 +34,8 @@ class QuickDnsSwitcher:
 
     def __init__(self, backend: NetworkBackendBase) -> None:
         self.dns_config: DnsConfiguration = DnsConfiguration(QuickDnsSwitcher.CONFIG_FILE)
-        self.backend = backend
+        self.backend: NetworkBackendBase = backend
+        self.last_dns_ips: Optional[List[str]] = None
 
         self.app: QApplication = QApplication(sys.argv)
         self._ensure_single_instance()
@@ -47,9 +48,9 @@ class QuickDnsSwitcher:
         self._build_menu()
 
         self.tray.setIcon(self._get_icon(QuickDnsSwitcher.DEFAULT_ICON_KEY))
-        self.tray.setContextMenu(self.menu)
         self.tray.show()
-        self._update_state()
+        self.tray.setContextMenu(self.menu)
+        QTimer.singleShot(0, self._update_state)
 
         self.timer: QTimer = QTimer()
         self.timer.timeout.connect(self._update_state)
@@ -96,34 +97,34 @@ class QuickDnsSwitcher:
 
     def _build_menu(self):
         # Title
-        title_action: QAction = QAction(QuickDnsSwitcher.APP_NAME.upper())
+        title_action: QAction = QAction(QuickDnsSwitcher.APP_NAME.upper(), self.menu)
         title_action.setEnabled(False)
         self.menu.addAction(title_action)
         self.menu.addSeparator()
         # Automatic DNS
-        self.auto_action: QAction = QAction(self._get_icon(QuickDnsSwitcher.AUTO_ICON_KEY), QuickDnsSwitcher.AUTO_MODE_NAME)
+        self.auto_action: QAction = QAction(self._get_icon(QuickDnsSwitcher.AUTO_ICON_KEY), QuickDnsSwitcher.AUTO_MODE_NAME, self.menu)
         self.auto_action.triggered.connect(self._make_set_dns_action(IpPair(4), IpPair(6)))
         self.menu.addAction(self.auto_action)
         self.menu.addSeparator()
         # Provider DNS
         for provider in sorted(self.dns_config.get_all(), key=lambda x: x.name):
-            provider_action: QAction = QAction(provider.name)
+            provider_action: QAction = QAction(provider.name, self.menu)
             provider_action.triggered.connect(self._make_set_dns_action(provider.ipv4, provider.ipv6))
-            provider_action.setIcon(self._get_icon(provider.icon))
+            provider_action.setIcon(self._get_icon(provider.icon, from_theme=provider.icon_from_theme))
             self.menu.addAction(provider_action)
             self.menu_provider_actions[provider.name] = provider_action
         self.menu.addSeparator()
         # Options
-        options_title_action: QAction = QAction("OPTIONS")
+        options_title_action: QAction = QAction("OPTIONS", self.menu)
         options_title_action.setEnabled(False)
         self.menu.addAction(options_title_action)
-        edit_action: QAction = QAction(QIcon.fromTheme("edit"), "Edit DNS providers")
+        edit_action: QAction = QAction(QIcon.fromTheme("edit"), "Edit DNS providers", self.menu)
         edit_action.triggered.connect(self._open_config)
         self.menu.addAction(edit_action)
-        restart_action: QAction = QAction(QIcon.fromTheme("vm-restart"), "Restart")
+        restart_action: QAction = QAction(QIcon.fromTheme("vm-restart"), "Restart", self.menu)
         restart_action.triggered.connect(self._restart_app)
         self.menu.addAction(restart_action)
-        exit_action: QAction = QAction(QIcon.fromTheme("exit"), "Exit")
+        exit_action: QAction = QAction(QIcon.fromTheme("exit"), "Exit", self.menu)
         exit_action.triggered.connect(self._quit_app)
         self.menu.addAction(exit_action)
 
@@ -145,7 +146,6 @@ class QuickDnsSwitcher:
 
 
     def _update_state(self):
-        global last_dns_ips
         connections: List[NetworkConnection] = self.backend.get_active_connections()
         dns_state: DnsState = DnsState.from_network_connections(connections)
 
@@ -176,14 +176,13 @@ class QuickDnsSwitcher:
         if active_name == QuickDnsSwitcher.AUTO_MODE_NAME:
             self.tray.setIcon(self._get_icon(QuickDnsSwitcher.AUTO_ICON_KEY))
         elif active_provider and active_provider.icon:
-            self.tray.setIcon(self._get_icon(active_provider.icon))
+            self.tray.setIcon(self._get_icon(active_provider.icon, from_theme=active_provider.icon_from_theme))
         else:
             self.tray.setIcon(self._get_icon(QuickDnsSwitcher.DEFAULT_ICON_KEY))
 
 
     def _send_notification(self, active_name: str, active_provider: Optional[DnsProvider], current_ips: List[str]) -> None:
-        global last_dns_ips
-        if last_dns_ips is not None and set(current_ips) != set(last_dns_ips):
+        if self.last_dns_ips is not None and set(current_ips) != set(self.last_dns_ips):
             icon = "network-server"
             if active_provider and active_provider.icon:
                 icon = os.path.join(QuickDnsSwitcher.ICONS_DIR, active_provider.icon)
@@ -191,8 +190,7 @@ class QuickDnsSwitcher:
             execute_command(
                 ["notify-send", "-a", QuickDnsSwitcher.APP_NAME, "-t", "5000", "-i", icon, active_name, body], False,
                 False)
-        last_dns_ips = current_ips
-        return current_ips
+        self.last_dns_ips = current_ips
 
 
     def _make_set_dns_action(self, ipv4: IpPair, ipv6: IpPair) -> Callable[..., Any]:
