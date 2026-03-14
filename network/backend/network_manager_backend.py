@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 import logging
 from typing import List, Optional
 from network.backend.network_backend_base import NetworkBackendBase
 from network.ip_pair import IpPair
 from network.network_connection import NetworkConnection
-from utils.constants import Constants
 from utils.tools import execute_command
 
 
 class NetworkManagerBackend(NetworkBackendBase):
+    IGNORED_DEVICES = {"", "lo", "tun0", "docker0", "virbr0", "tailscale0", "wg0"}
 
     def __init__(self):
         self.connections = []
@@ -28,7 +29,7 @@ class NetworkManagerBackend(NetworkBackendBase):
         connected: bool = False
 
         def flush():
-            if device and name and connected and device not in Constants.IGNORED_DEVICES:
+            if device and name and connected and device not in NetworkManagerBackend.IGNORED_DEVICES:
                 self.connections.append(
                     NetworkConnection(
                         name,

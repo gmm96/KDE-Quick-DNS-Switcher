@@ -3,8 +3,6 @@
 
 from abc import abstractmethod, ABC
 from typing import List
-
-from network.dns_state import DnsState
 from network.ip_pair import IpPair
 from network.network_connection import NetworkConnection
 

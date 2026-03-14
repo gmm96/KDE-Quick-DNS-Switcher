@@ -4,13 +4,11 @@
 import subprocess
 import sys
 from PyQt6.QtWidgets import QMessageBox
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from typing import List
-from utils.constants import Constants
 
 
 def display_error_dialog(content: str) -> None:
-    QMessageBox.critical(None, f"Error - {Constants.APP_NAME}", content)
+    QMessageBox.critical(None, f"Error - Quick DNS Switcher", content)
 
 
 def execute_command(args: List[str], output: bool = True, raise_error: bool = True) -> subprocess.CompletedProcess:

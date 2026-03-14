@@ -148,28 +148,19 @@ class QuickDnsSwitcher:
     def _update_state(self):
         connections: List[NetworkConnection] = self.backend.get_active_connections()
         dns_state: DnsState = DnsState.from_network_connections(connections)
-
-        active_name: str = QuickDnsSwitcher.DEFAULT_MODE_NAME
         if not dns_state.ipv4_ignore_auto_dns and not dns_state.ipv6_ignore_auto_dns:
-            active_name = QuickDnsSwitcher.AUTO_MODE_NAME
+            active_name: str = QuickDnsSwitcher.AUTO_MODE_NAME
         else:
-            for dns_provider in self.dns_config.get_all():
-                if dns_state.matches_provider(dns_provider):
-                    active_name = dns_provider.name
-                    break
-
-        # Tray icon
+            active_name: str = next(
+                (provider.name for provider in self.dns_config.get_all() if dns_state.matches_provider(provider)),
+                QuickDnsSwitcher.DEFAULT_MODE_NAME
+            )
         active_provider: Optional[DnsProvider] = self.dns_config.get_by_name(active_name)
         self._update_tray_icon(active_name, active_provider)
-        # Menu items
-        self.auto_action.setText(f"✔ {QuickDnsSwitcher.AUTO_MODE_NAME}" if active_name == QuickDnsSwitcher.AUTO_MODE_NAME else QuickDnsSwitcher.AUTO_MODE_NAME)
-        for name, action in self.menu_provider_actions.items():
-            action.setText(f"✔ {name}" if name == active_name else name)
-        # Notification
+        self._update_menu_items(active_name)
         current_ips: List[str] = dns_state.all_ips
         self._send_notification(active_name, active_provider, current_ips)
-        # Tooltip
-        self.tray.setToolTip(f"{QuickDnsSwitcher.APP_NAME}\n{active_name}\n----------------------------\n" + "\n".join(current_ips))
+        self._update_tooltip(active_name, current_ips)
 
 
     def _update_tray_icon(self, active_name: str, active_provider: Optional[DnsProvider]):
@@ -179,6 +170,16 @@ class QuickDnsSwitcher:
             self.tray.setIcon(self._get_icon(active_provider.icon, from_theme=active_provider.icon_from_theme))
         else:
             self.tray.setIcon(self._get_icon(QuickDnsSwitcher.DEFAULT_ICON_KEY))
+
+
+    def _update_menu_items(self, active_name: str):
+        self.auto_action.setText(
+            f"✔ {QuickDnsSwitcher.AUTO_MODE_NAME}"
+            if active_name == QuickDnsSwitcher.AUTO_MODE_NAME
+            else QuickDnsSwitcher.AUTO_MODE_NAME
+        )
+        for name, action in self.menu_provider_actions.items():
+            action.setText(f"✔ {name}" if name == active_name else name)
 
 
     def _send_notification(self, active_name: str, active_provider: Optional[DnsProvider], current_ips: List[str]) -> None:
@@ -191,6 +192,17 @@ class QuickDnsSwitcher:
                 ["notify-send", "-a", QuickDnsSwitcher.APP_NAME, "-t", "5000", "-i", icon, active_name, body], False,
                 False)
         self.last_dns_ips = current_ips
+
+
+    def _update_tooltip(self, active_name: str, current_ips: List[str]) -> None:
+        tooltip_text = (
+            f"{QuickDnsSwitcher.APP_NAME}\n"
+            f"{'-' * 28}\n"
+            f"{active_name}\n"
+            f"{'-' * 28}\n"
+            f"{'\n'.join(current_ips)}"
+        )
+        self.tray.setToolTip(tooltip_text)
 
 
     def _make_set_dns_action(self, ipv4: IpPair, ipv6: IpPair) -> Callable[..., Any]:
