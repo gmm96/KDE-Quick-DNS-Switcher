@@ -13,9 +13,9 @@ from src.utils.tools import execute_command
 class NetworkManagerBackend(NetworkBackendBase):
     IGNORED_DEVICES: Set[str] = {"", "lo", "tun0", "docker0", "virbr0", "tailscale0", "wg0"}
 
-    def __init__(self, connections: Optional[List[NetworkConnection]] = None) -> None:
-        self.connections: List[NetworkConnection] = connections if connections else []
-    
+    def __init__(self) -> None:
+        self.connections: List[NetworkConnection] = []
+
     def get_dns_state(self) -> DnsState:
         self.connections = []
         self._retrieve_active_connections_info()
