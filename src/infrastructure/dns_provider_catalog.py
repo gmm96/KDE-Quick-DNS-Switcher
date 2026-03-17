@@ -4,14 +4,15 @@
 import os
 import json
 import sys
-from typing import List, Optional
-from src.network.dns_provider import DnsProvider
+from pathlib import Path
+from typing import List, Optional, Dict
+from src.domain.models.dns_provider import DnsProvider
 from src.utils.tools import display_error_dialog
 
 
 class DnsProviderCatalog:
-    def __init__(self, file_path: str) -> None:
-        self.file_path: str = file_path
+    def __init__(self, file_path: Path) -> None:
+        self.file_path: Path = file_path
         self.providers: List[DnsProvider]= []
         self._load()
 
@@ -21,7 +22,7 @@ class DnsProviderCatalog:
             sys.exit(1)
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                data: Dict[str, Dict[str, str]] = json.load(f)
         except json.JSONDecodeError as e:
             display_error_dialog(f"Invalid JSON format in DNS configuration file:\n\n{self.file_path}\n\n{e}")
             sys.exit(1)

@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from typing import List, Optional, Tuple, Set
-from src.network.backend.network_backend_base import NetworkBackendBase
-from src.network.dns_state import DnsState
-from src.network.ip_pair import IpPair
-from src.network.network_connection import NetworkConnection
+from typing import List, Optional, Set
+from src.infrastructure.backend.network_backend_base import NetworkBackendBase
+from src.domain.models.dns_snapshot import DnsSnapshot
+from src.domain.models.ip_pair import IpPair
+from src.domain.models.network_connection import NetworkConnection
 from src.utils.tools import execute_command
 
 
@@ -16,11 +16,11 @@ class NetworkManagerBackend(NetworkBackendBase):
     def __init__(self) -> None:
         self.connections: List[NetworkConnection] = []
 
-    def get_dns_state(self) -> DnsState:
+    def get_dns_snapshot(self) -> DnsSnapshot:
         self.connections = []
         self._retrieve_active_connections_info()
         self._fill_auto_ignore_dns_field()
-        return DnsState(self.connections)
+        return DnsSnapshot(self.connections)
 
     def _retrieve_active_connections_info(self) -> None:
         name: Optional[str] = None
@@ -85,7 +85,7 @@ class NetworkManagerBackend(NetworkBackendBase):
         v6_ips: List[str] = ipv6.get_ip_list()
         v4_ignore_auto: str = "yes" if v4_ips else "no"
         v6_ignore_auto: str = "yes" if v6_ips else "no"
-        for conn in self.get_dns_state().connections:
+        for conn in self.get_dns_snapshot().connections:
             execute_command([
                 "nmcli",
                 "connection",
@@ -97,5 +97,5 @@ class NetworkManagerBackend(NetworkBackendBase):
             ])
             result_reapply = execute_command(["nmcli", "device", "reapply", conn.device], True, False)
             if result_reapply.returncode != 0:
-                logging.warning("Error resetting network, trying aggressive method...", stack_info=True)
+                logging.warning("Error resetting infrastructure, trying aggressive method...", stack_info=True)
                 execute_command(["nmcli", "connection", "up", conn.name], True, True)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from typing import Optional, Dict
-from src.network.ip_pair import IpPair
+from src.domain.models.ip_pair import IpPair
 
 
 class DnsProvider:

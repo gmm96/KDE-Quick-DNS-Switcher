@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from abc import abstractmethod, ABC
-from src.network.dns_state import DnsState
-from src.network.ip_pair import IpPair
+from src.domain.models.dns_snapshot import DnsSnapshot
+from src.domain.models.ip_pair import IpPair
 
 
 class NetworkBackendBase(ABC):
     @abstractmethod
-    def get_dns_state(self) -> DnsState:
+    def get_dns_snapshot(self) -> DnsSnapshot:
         pass
 
     @abstractmethod
