@@ -108,7 +108,7 @@ class TrayController:
         title: str = view.display_name
         if view.mode != ActiveDnsMode.DISCONNECTED:
             title = f"{title} DNS"
-        dash_count: int = 20
+        dash_count: int = 16
         tooltip: str = (
             f"{UiConstants.APP_NAME}\n"
             f"{'─' * dash_count}\n"
