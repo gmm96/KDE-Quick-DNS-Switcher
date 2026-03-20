@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from typing import List, Optional, Set
+from subprocess import CompletedProcess
+from typing import List, Optional
 from src.domain.models.device_type import DeviceType
 from src.infrastructure.backend.network_backend_base import NetworkBackendBase
 from src.domain.models.dns_snapshot import DnsSnapshot
 from src.domain.models.ip_pair import IpPair
 from src.domain.models.network_connection import NetworkConnection
-from src.utils.tools import execute_command
+from src.infrastructure.command_executor import CommandExecutor
 
 
 class NetworkManagerBackend(NetworkBackendBase):
@@ -28,9 +29,15 @@ class NetworkManagerBackend(NetworkBackendBase):
         ipv4_list: List[str] = []
         ipv6_list: List[str] = []
         connected: bool = False
-        result = execute_command([
-            "nmcli", "-t", "-f", "GENERAL.CONNECTION,GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,IP4.DNS,IP6.DNS", "device", "show"
-        ])
+        result = CommandExecutor.execute(
+            [
+                "nmcli",
+                "-t", "-f",
+                "GENERAL.CONNECTION,GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,IP4.DNS,IP6.DNS",
+                "device", "show"
+            ],
+            check=True
+        )
         for line in result.stdout.splitlines():
             line = line.strip()
             if not line: continue
@@ -78,8 +85,9 @@ class NetworkManagerBackend(NetworkBackendBase):
 
     def _fill_auto_ignore_dns_field(self) -> None:
         for conn in self.connections:
-            result = execute_command(
-                ["nmcli", "-g", "ipv4.ignore-auto-dns,ipv6.ignore-auto-dns", "connection", "show", conn.name]
+            result: CompletedProcess = CommandExecutor.execute(
+                ["nmcli", "-g", "ipv4.ignore-auto-dns,ipv6.ignore-auto-dns", "connection", "show", conn.name],
+                check=True
             )
             ipv4_ignore_auto_dns, ipv6_ignore_auto_dns = [line.strip() for line in result.stdout.splitlines() if line.strip()]
             conn.parse_ignore_auto_dns(ipv4_ignore_auto_dns, ipv6_ignore_auto_dns)
@@ -90,16 +98,19 @@ class NetworkManagerBackend(NetworkBackendBase):
         v4_ignore_auto: str = "yes" if v4_ips else "no"
         v6_ignore_auto: str = "yes" if v6_ips else "no"
         for conn in self.get_dns_snapshot().connections:
-            execute_command([
-                "nmcli",
-                "connection",
-                "modify", conn.name,
-                "ipv4.ignore-auto-dns", v4_ignore_auto,
-                "ipv6.ignore-auto-dns", v6_ignore_auto,
-                "ipv4.dns", ",".join(v4_ips),
-                "ipv6.dns", ",".join(v6_ips)
-            ])
-            result_reapply = execute_command(["nmcli", "device", "reapply", conn.device], True, False)
+            CommandExecutor.execute(
+                [
+                    "nmcli",
+                    "connection",
+                    "modify", conn.name,
+                    "ipv4.ignore-auto-dns", v4_ignore_auto,
+                    "ipv6.ignore-auto-dns", v6_ignore_auto,
+                    "ipv4.dns", ",".join(v4_ips),
+                    "ipv6.dns", ",".join(v6_ips)
+                ],
+                check=True
+            )
+            result_reapply: CompletedProcess = CommandExecutor.execute(["nmcli", "device", "reapply", conn.device], check=False)
             if result_reapply.returncode != 0:
                 logging.warning("Error resetting infrastructure, trying aggressive method...", stack_info=True)
-                execute_command(["nmcli", "connection", "up", conn.name], True, True)
+                CommandExecutor.execute(["nmcli", "connection", "up", conn.name], check=True)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from functools import partial
 from pathlib import Path
 from typing import Dict, Callable, Any
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
@@ -11,6 +12,7 @@ from src.domain.models.active_dns_view import ActiveDnsView
 from src.infrastructure.dns_provider_catalog import DnsProviderCatalog
 from src.domain.models.ip_pair import IpPair
 from src.ui.ui_constants import UiConstants
+from src.ui.ui_context import UiContext
 
 
 class TrayController:
@@ -60,7 +62,7 @@ class TrayController:
 
     def _build_menu(self, open_config_callback: Callable, restart_callback: Callable, quit_callback: Callable) -> None:
         # Title
-        title_action: QAction = QAction(UiConstants.APP_NAME.upper(), self.menu)
+        title_action: QAction = QAction(f"──  {UiConstants.APP_NAME.upper()}  ──", self.menu)
         title_action.setEnabled(False)
         self.menu.addAction(title_action)
         self.menu.addSeparator()
@@ -71,23 +73,23 @@ class TrayController:
         self.menu.addSeparator()
         # Provider DNS
         for provider in sorted(self.catalog.providers, key=lambda x: x.name):
-            action: QAction = QAction(provider.name, self.menu)
+            action: QAction = QAction(f"{provider.name} más algo", self.menu)
             action.triggered.connect(self._make_set_dns_action(provider.ipv4, provider.ipv6))
             action.setIcon(self._get_icon(provider.icon, provider.icon_from_theme))
             self.menu.addAction(action)
             self.menu_provider_actions[provider.name] = action
         self.menu.addSeparator()
         # Options
-        options_title: QAction = QAction("OPTIONS", self.menu)
+        options_title: QAction = QAction("──────  OPTIONS  ──────", self.menu)
         options_title.setEnabled(False)
         self.menu.addAction(options_title)
-        edit_action: QAction = QAction(QIcon.fromTheme("edit"), "Edit DNS providers", self.menu)
+        edit_action: QAction = QAction(QIcon.fromTheme("edit"), "      Edit DNS providers", self.menu)
         edit_action.triggered.connect(open_config_callback)
         self.menu.addAction(edit_action)
-        restart_action: QAction = QAction(QIcon.fromTheme("vm-restart"), "Restart", self.menu)
+        restart_action: QAction = QAction(QIcon.fromTheme("vm-restart"), "      Restart", self.menu)
         restart_action.triggered.connect(restart_callback)
         self.menu.addAction(restart_action)
-        exit_action: QAction = QAction(QIcon.fromTheme("exit"), "Exit", self.menu)
+        exit_action: QAction = QAction(QIcon.fromTheme("exit"), "      Exit", self.menu)
         exit_action.triggered.connect(quit_callback)
         self.menu.addAction(exit_action)
 
@@ -100,14 +102,12 @@ class TrayController:
         self.tray.setIcon(self._get_icon(view.icon_key, view.from_theme))
 
     def _update_menu(self, view: ActiveDnsView) -> None:
-        self.auto_action.setText(f"✔ {UiConstants.AUTO_NAME}" if view.mode == ActiveDnsMode.AUTO else UiConstants.AUTO_NAME)
+        self.auto_action.setText(f" ✔  {UiConstants.AUTO_NAME}" if view.mode == ActiveDnsMode.AUTO else f"      {UiConstants.AUTO_NAME}")
         for name, action in self.menu_provider_actions.items():
-            action.setText(f"✔ {name}" if name == view.display_name else name)
+            action.setText(f" ✔  {name}" if name == view.display_name else f"      {name}")
 
     def _update_tooltip(self, view: ActiveDnsView) -> None:
-        title: str = view.display_name
-        if view.mode != ActiveDnsMode.DISCONNECTED:
-            title = f"{title} DNS"
+        title: str = f"{view.display_name} DNS" if view.mode != ActiveDnsMode.DISCONNECTED else view.display_name
         dash_count: int = 16
         tooltip: str = (
             f"{UiConstants.APP_NAME}\n"
@@ -120,5 +120,7 @@ class TrayController:
 
     def _make_set_dns_action(self, ipv4: IpPair, ipv6: IpPair) -> Callable[..., None]:
         def handler(*args: Any) -> None:
-            self.set_dns_callback(ipv4, ipv6)
+            callback_ref: Callable[..., None] = partial(self.set_dns_callback, ipv4, ipv6)
+            wrapped: Callable[..., None] = UiContext.safe_callback(callback_ref)
+            wrapped()
         return handler

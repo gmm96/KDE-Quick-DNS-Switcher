@@ -3,11 +3,10 @@
 
 import os
 import json
-import sys
 from pathlib import Path
 from typing import List, Optional, Dict
 from src.domain.models.dns_provider import DnsProvider
-from src.utils.tools import display_error_dialog
+from src.infrastructure.errors.dns_catalog_load_error import DnsCatalogLoadError
 
 
 class DnsProviderCatalog:
@@ -18,17 +17,14 @@ class DnsProviderCatalog:
 
     def _load(self) -> None:
         if not os.path.exists(self.file_path):
-            display_error_dialog(f"DNS configuration file not found:\n\n{self.file_path}")
-            sys.exit(1)
+            raise DnsCatalogLoadError(f"DNS configuration file not found:\n\n{self.file_path}")
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
                 data: Dict[str, Dict[str, str]] = json.load(f)
         except json.JSONDecodeError as e:
-            display_error_dialog(f"Invalid JSON format in DNS configuration file:\n\n{self.file_path}\n\n{e}")
-            sys.exit(1)
+            raise DnsCatalogLoadError(f"Invalid JSON format in DNS configuration file:\n\n{self.file_path}\n\n{e}") from e
         except Exception as e:
-            display_error_dialog(f"Unexpected error loading DNS configuration file:\n\n{self.file_path}\n\n{e}")
-            sys.exit(1)
+            raise DnsCatalogLoadError(f"Unexpected error loading DNS configuration file:\n\n{self.file_path}\n\n{e}") from e
         self.providers = [DnsProvider.from_dict(name, details) for name, details in data.items()]
 
     def get_provider_by_name(self, name: str) -> Optional[DnsProvider]:

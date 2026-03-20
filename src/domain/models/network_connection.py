@@ -8,21 +8,24 @@ from src.domain.models.ip_pair import IpPair
 
 
 class NetworkConnection:
-    def __init__(self, name: str, device: str, type: DeviceType, ipv4: IpPair, ipv6: IpPair, ipv4_ignore_auto_dns: bool = False, ipv6_ignore_auto_dns: bool = False) -> None:
+    IGNORE_AUTO_DNS_TRUE: str = "yes"
+    IGNORE_AUTO_DNS_FALSE: str = "no"
+    IGNORE_AUTO_DNS_VALUES: Tuple[str, str] = (IGNORE_AUTO_DNS_TRUE, IGNORE_AUTO_DNS_FALSE)
+
+    def __init__(self, name: str, device: str, device_type: DeviceType, ipv4: IpPair, ipv6: IpPair, ipv4_ignore_auto_dns: bool = False, ipv6_ignore_auto_dns: bool = False) -> None:
         self.name: str = name
         self.device: str = device
-        self.type: DeviceType = type
+        self.type: DeviceType = device_type
         self.ipv4: IpPair = ipv4
         self.ipv6: IpPair = ipv6
         self.ipv4_ignore_auto_dns: bool = ipv4_ignore_auto_dns
         self.ipv6_ignore_auto_dns: bool = ipv6_ignore_auto_dns
 
     def parse_ignore_auto_dns(self, value_ipv4: str, value_ipv6: str) -> None:
-        possible_values: Tuple[str, str] = ("yes", "no")
-        if value_ipv4 in possible_values:
-            self.ipv4_ignore_auto_dns = value_ipv4 == "yes"
-        if value_ipv6 in possible_values:
-            self.ipv6_ignore_auto_dns = value_ipv6 == "yes"
+        if value_ipv4 in NetworkConnection.IGNORE_AUTO_DNS_VALUES:
+            self.ipv4_ignore_auto_dns = value_ipv4 == NetworkConnection.IGNORE_AUTO_DNS_TRUE
+        if value_ipv6 in NetworkConnection.IGNORE_AUTO_DNS_VALUES:
+            self.ipv6_ignore_auto_dns = value_ipv6 == NetworkConnection.IGNORE_AUTO_DNS_TRUE
 
     def get_dns_identity(self) -> Tuple[str, str, str, str, bool, bool]:
         return (

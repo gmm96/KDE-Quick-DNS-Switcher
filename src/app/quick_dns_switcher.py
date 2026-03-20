@@ -2,22 +2,23 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import subprocess
 from typing import Optional
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
 from src.config.paths import Paths
 from src.domain.models.active_dns import ActiveDns
+from src.domain.models.active_dns_mode import ActiveDnsMode
 from src.domain.models.active_dns_view import ActiveDnsView
 from src.domain.services.dns_resolver import DnsResolver
 from src.infrastructure.backend.network_backend_base import NetworkBackendBase
+from src.infrastructure.command_executor import CommandExecutor
 from src.infrastructure.dns_provider_catalog import DnsProviderCatalog
 from src.domain.models.dns_snapshot import DnsSnapshot
 from src.domain.models.ip_pair import IpPair
+from src.infrastructure.system_notifier import SystemNotifier
 from src.ui.tray_controller import TrayController
-from src.ui.ui_constants import UiConstants
-from src.utils.tools import execute_command
+from src.ui.ui_context import UiContext
 
 
 class QuickDnsSwitcher:
@@ -37,9 +38,9 @@ class QuickDnsSwitcher:
             restart_callback=self._restart_app,
             quit_callback=self._quit_app
         )
-        QTimer.singleShot(0, self._update_state)
+        QTimer.singleShot(0, UiContext.safe_callback(self._update_state))
         self.timer: QTimer = QTimer()
-        self.timer.timeout.connect(self._update_state)
+        self.timer.timeout.connect(UiContext.safe_callback(self._update_state))
         self.timer.start(1500)
 
     def run(self) -> None:
@@ -56,7 +57,7 @@ class QuickDnsSwitcher:
 
     def _set_dns(self, ipv4: IpPair, ipv6: IpPair) -> None:
         self.backend.set_dns(ipv4, ipv6)
-        QTimer.singleShot(500, self._update_state)
+        QTimer.singleShot(500, UiContext.safe_callback(self._update_state))
 
     def _update_state(self) -> None:
         dns_snapshot: DnsSnapshot = self.backend.get_dns_snapshot()
@@ -71,27 +72,17 @@ class QuickDnsSwitcher:
     @staticmethod
     def _send_notification(view: ActiveDnsView) -> None:
         icon: str = str(Paths.ICONS_DIR / view.icon_key) if not view.from_theme else view.icon_key
-        execute_command(
-        ["notify-send",
-                "-a", UiConstants.APP_NAME,
-                "-t", "5000",
-                "-i", icon,
-                f"{view.display_name} DNS",
-                "\n".join(view.body),
-            ],
-            output=False,
-            raise_error=False
-        )
+        title: str = f"{view.display_name} DNS" if view.mode != ActiveDnsMode.DISCONNECTED else view.display_name
+        SystemNotifier.notify(title, "\n".join(view.body), icon)
 
     @staticmethod
     def _open_config() -> None:
-        subprocess.Popen(["xdg-open", Paths.DNS_PROVIDERS_FILE])
+        CommandExecutor.execute_async(["xdg-open", Paths.DNS_PROVIDERS_FILE])
 
     @staticmethod
     def _restart_app() -> None:
-        python: str = sys.executable
         QApplication.quit()
-        subprocess.Popen([python, "-m", "src.main"] + sys.argv[1:])
+        CommandExecutor.execute_async([sys.executable, "-m", "src.main"] + sys.argv[1:])
 
     def _quit_app(self) -> None:
         self.app.quit()
