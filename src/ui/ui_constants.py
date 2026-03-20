@@ -12,6 +12,6 @@ class UiConstants:
     # Default description
     DEFAULT_BODY = "Default"
     # Icons from theme
-    AUTO_ICON_KEY = "network-workgroup"
-    DISCONNECTED_ICON_KEY = "network-disconnect-symbolic"
-    DEFAULT_ICON_KEY = "network-server"
+    AUTO_ICON = "auto.svg"
+    DISCONNECTED_ICON = "disconnected.svg"
+    DEFAULT_ICON = "unknown.svg"

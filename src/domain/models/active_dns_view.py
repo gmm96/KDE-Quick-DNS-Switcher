@@ -22,20 +22,20 @@ class ActiveDnsView:
     def from_active_dns(active_dns: ActiveDns) -> ActiveDnsView:
         if active_dns.mode == ActiveDnsMode.DISCONNECTED:
             display_name: str = UiConstants.DISCONNECTED_NAME
-            icon_key: str = UiConstants.DISCONNECTED_ICON_KEY
-            from_theme: bool = True
+            icon_key: str = UiConstants.DISCONNECTED_ICON
+            from_theme: bool = False
         elif active_dns.mode == ActiveDnsMode.AUTO:
             display_name: str = UiConstants.AUTO_NAME
-            icon_key: str = UiConstants.AUTO_ICON_KEY
-            from_theme: bool = True
+            icon_key: str = UiConstants.AUTO_ICON
+            from_theme: bool = False
         elif active_dns.provider:
             display_name: str = active_dns.provider.name
             icon_key: str = active_dns.provider.icon
             from_theme: bool = active_dns.provider.icon_from_theme
         else:
             display_name: str = UiConstants.CUSTOM_NAME
-            icon_key: str = UiConstants.DEFAULT_ICON_KEY
-            from_theme: bool = True
+            icon_key: str = UiConstants.DEFAULT_ICON
+            from_theme: bool = False
         body: List[str] = active_dns.dns_snapshot.all_ips if active_dns.dns_snapshot.all_ips else [UiConstants.DEFAULT_BODY]
         return ActiveDnsView(
             display_name=display_name,

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from functools import partial
 from pathlib import Path
 from typing import Dict, Callable, Any
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
@@ -34,14 +33,14 @@ class TrayController:
         self.storage_icons: Dict[str, QIcon] = {}
         self._create_icons()
         self._build_menu(open_config_callback, restart_callback, quit_callback)
-        self.tray.setIcon(self._get_icon(UiConstants.DEFAULT_ICON_KEY))
+        self.tray.setIcon(self._get_icon(UiConstants.DEFAULT_ICON, False))
         self.tray.setContextMenu(self.menu)
         self.tray.show()
 
     def _create_icons(self) -> None:
-        self.theme_icons[UiConstants.DISCONNECTED_ICON_KEY] = QIcon.fromTheme(UiConstants.DISCONNECTED_ICON_KEY)
-        self.theme_icons[UiConstants.AUTO_ICON_KEY] = QIcon.fromTheme(UiConstants.AUTO_ICON_KEY)
-        self.theme_icons[UiConstants.DEFAULT_ICON_KEY] = QIcon.fromTheme(UiConstants.DEFAULT_ICON_KEY)
+        self.storage_icons[UiConstants.AUTO_ICON] = QIcon(str(Paths.ICONS_DIR / UiConstants.AUTO_ICON))
+        self.storage_icons[UiConstants.DEFAULT_ICON] = QIcon(str(Paths.ICONS_DIR / UiConstants.DEFAULT_ICON))
+        self.storage_icons[UiConstants.DISCONNECTED_ICON] = QIcon(str(Paths.ICONS_DIR / UiConstants.DISCONNECTED_ICON))
         for provider in self.catalog.providers:
             if provider.icon:
                 if provider.icon_from_theme:
@@ -55,10 +54,10 @@ class TrayController:
                         if not qicon.isNull():
                             self.storage_icons[provider.icon] = qicon
 
-    def _get_icon(self, key: str, from_theme: bool = True) -> QIcon:
+    def _get_icon(self, key: str, from_theme: bool) -> QIcon:
         if from_theme:
-            return self.theme_icons.get(key, self.theme_icons[UiConstants.DEFAULT_ICON_KEY])
-        return self.storage_icons.get(key, self.theme_icons[UiConstants.DEFAULT_ICON_KEY])
+            return self.theme_icons.get(key, self.storage_icons[UiConstants.DEFAULT_ICON])
+        return self.storage_icons.get(key, self.storage_icons[UiConstants.DEFAULT_ICON])
 
     def _build_menu(self, open_config_callback: Callable, restart_callback: Callable, quit_callback: Callable) -> None:
         # Title
@@ -67,7 +66,7 @@ class TrayController:
         self.menu.addAction(title_action)
         self.menu.addSeparator()
         # Automatic DNS
-        self.auto_action = QAction(self._get_icon(UiConstants.AUTO_ICON_KEY), UiConstants.AUTO_NAME, self.menu)
+        self.auto_action = QAction(self._get_icon(UiConstants.AUTO_ICON, False), UiConstants.AUTO_NAME, self.menu)
         self.auto_action.triggered.connect(self._make_set_dns_action(IpPair(4), IpPair(6)))
         self.menu.addAction(self.auto_action)
         self.menu.addSeparator()
@@ -102,9 +101,9 @@ class TrayController:
         self.tray.setIcon(self._get_icon(view.icon_key, view.from_theme))
 
     def _update_menu(self, view: ActiveDnsView) -> None:
-        self.auto_action.setText(f" ✔  {UiConstants.AUTO_NAME}" if view.mode == ActiveDnsMode.AUTO else f"      {UiConstants.AUTO_NAME}")
+        self.auto_action.setText(f"  ✔ {UiConstants.AUTO_NAME}" if view.mode == ActiveDnsMode.AUTO else f"      {UiConstants.AUTO_NAME}")
         for name, action in self.menu_provider_actions.items():
-            action.setText(f" ✔  {name}" if name == view.display_name else f"      {name}")
+            action.setText(f"  ✔ {name}" if name == view.display_name else f"      {name}")
 
     def _update_tooltip(self, view: ActiveDnsView) -> None:
         title: str = f"{view.display_name} DNS" if view.mode != ActiveDnsMode.DISCONNECTED else view.display_name
@@ -120,7 +119,7 @@ class TrayController:
 
     def _make_set_dns_action(self, ipv4: IpPair, ipv6: IpPair) -> Callable[..., None]:
         def handler(*args: Any) -> None:
-            callback_ref: Callable[..., None] = partial(self.set_dns_callback, ipv4, ipv6)
+            callback_ref: Callable[..., None] = lambda: self.set_dns_callback(ipv4, ipv6)
             wrapped: Callable[..., None] = UiContext.safe_callback(callback_ref)
             wrapped()
         return handler

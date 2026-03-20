@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from src.app.error_handler import ErrorHandler
 from src.app.quick_dns_switcher import QuickDnsSwitcher
 from src.config.paths import Paths
 from src.domain.services.dns_resolver import DnsResolver
