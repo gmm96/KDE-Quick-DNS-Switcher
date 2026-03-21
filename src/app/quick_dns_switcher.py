@@ -16,19 +16,26 @@ from src.infrastructure.command_executor import CommandExecutor
 from src.infrastructure.dns_provider_catalog import DnsProviderCatalog
 from src.domain.models.dns_snapshot import DnsSnapshot
 from src.domain.models.ip_pair import IpPair
-from src.infrastructure.system_notifier import SystemNotifier
+from src.infrastructure.notifications.notifier_base import NotifierBase
+from src.infrastructure.notifications.qt_notifier import QtNotifier
+from src.ui.models.app_icon import AppIcon
 from src.ui.tray_controller import TrayController
+from src.ui.ui_constants import UiConstants
 from src.ui.ui_context import UiContext
 
 
 class QuickDnsSwitcher:
-    def __init__(self, backend: NetworkBackendBase, catalog: DnsProviderCatalog, resolver: DnsResolver) -> None:
+    def __init__(self, backend: NetworkBackendBase, catalog: DnsProviderCatalog, resolver: DnsResolver, notifier: NotifierBase) -> None:
         self.app_id: str = "quick_dns_switcher"
         self.backend: NetworkBackendBase = backend
         self.catalog: DnsProviderCatalog = catalog
         self.resolver: DnsResolver = resolver
+        self.notifier: NotifierBase = notifier
         self.dns_snapshot: Optional[DnsSnapshot] = None
         self.app: QApplication = QApplication(sys.argv)
+        self.app.setDesktopFileName(UiConstants.APP_NAME)
+        self.app.setQuitOnLastWindowClosed(False)
+        self.app.setApplicationName(UiConstants.APP_NAME)
         self._ensure_single_instance()
         self.tray: TrayController = TrayController(
             app=self.app,
@@ -38,6 +45,8 @@ class QuickDnsSwitcher:
             restart_callback=self._restart_app,
             quit_callback=self._quit_app
         )
+        if isinstance(self.notifier, QtNotifier):
+            self.notifier.set_tray(self.tray.tray)
         QTimer.singleShot(0, UiContext.safe_callback(self._update_state))
         self.timer: QTimer = QTimer()
         self.timer.timeout.connect(UiContext.safe_callback(self._update_state))
@@ -69,11 +78,10 @@ class QuickDnsSwitcher:
         self._send_notification(view)
         self.dns_snapshot: DnsSnapshot = dns_snapshot
 
-    @staticmethod
-    def _send_notification(view: ActiveDnsView) -> None:
-        icon: str = str(Paths.ICONS_DIR / view.icon_key) if not view.from_theme else view.icon_key
+    def _send_notification(self, view: ActiveDnsView) -> None:
+        icon: AppIcon = self.tray.get_icon(view.icon_key, view.from_theme)
         title: str = f"{view.display_name} DNS" if view.mode != ActiveDnsMode.DISCONNECTED else view.display_name
-        SystemNotifier.notify(title, "\n".join(view.body), icon)
+        self.notifier.notify(title, "\n".join(view.body), icon)
 
     @staticmethod
     def _open_config() -> None:

@@ -6,6 +6,7 @@ from src.config.paths import Paths
 from src.domain.services.dns_resolver import DnsResolver
 from src.infrastructure.backend.backend_factory import BackendFactory
 from src.infrastructure.dns_provider_catalog import DnsProviderCatalog
+from src.infrastructure.notifications.notifier_factory import NotifierFactory
 
 
 class Bootstrap:
@@ -14,4 +15,5 @@ class Bootstrap:
          backend = BackendFactory.create()
          catalog = DnsProviderCatalog(Paths.DNS_PROVIDERS_FILE)
          resolver = DnsResolver(catalog)
-         return QuickDnsSwitcher(backend, catalog, resolver)
+         notifier = NotifierFactory.create()
+         return QuickDnsSwitcher(backend, catalog, resolver, notifier)
