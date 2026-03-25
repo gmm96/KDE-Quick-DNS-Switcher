@@ -16,6 +16,8 @@ from src.infrastructure.command_executor import CommandExecutor
 from src.infrastructure.dns_provider_catalog import DnsProviderCatalog
 from src.domain.models.dns_snapshot import DnsSnapshot
 from src.domain.models.ip_pair import IpPair
+from src.infrastructure.monitoring.event_debouncer import Debouncer
+from src.infrastructure.monitoring.network_monitor_base import NetworkMonitorBase
 from src.infrastructure.notifications.notifier_base import NotifierBase
 from src.infrastructure.notifications.qt_notifier import QtNotifier
 from src.ui.models.app_icon import AppIcon
@@ -25,12 +27,14 @@ from src.ui.ui_context import UiContext
 
 
 class QuickDnsSwitcher:
-    def __init__(self, backend: NetworkBackendBase, catalog: DnsProviderCatalog, resolver: DnsResolver, notifier: NotifierBase) -> None:
+    def __init__(self, backend: NetworkBackendBase, catalog: DnsProviderCatalog, resolver: DnsResolver, notifier: NotifierBase, network_monitor: NetworkMonitorBase) -> None:
         self.app_id: str = "quick_dns_switcher"
         self.backend: NetworkBackendBase = backend
         self.catalog: DnsProviderCatalog = catalog
         self.resolver: DnsResolver = resolver
         self.notifier: NotifierBase = notifier
+        self.network_monitor: NetworkMonitorBase = network_monitor
+        self.debouncer: Debouncer = Debouncer(self._update_state, 300)
         self.dns_snapshot: Optional[DnsSnapshot] = None
         self.app: QApplication = QApplication(sys.argv)
         self.app.setDesktopFileName(UiConstants.APP_NAME)
@@ -47,10 +51,8 @@ class QuickDnsSwitcher:
         )
         if isinstance(self.notifier, QtNotifier):
             self.notifier.set_tray(self.tray.tray)
+        self.network_monitor.on_event(self._on_network_event)
         QTimer.singleShot(0, UiContext.safe_callback(self._update_state))
-        self.timer: QTimer = QTimer()
-        self.timer.timeout.connect(UiContext.safe_callback(self._update_state))
-        self.timer.start(1500)
 
     def run(self) -> None:
         sys.exit(self.app.exec())
@@ -94,3 +96,6 @@ class QuickDnsSwitcher:
 
     def _quit_app(self) -> None:
         self.app.quit()
+
+    def _on_network_event(self) -> None:
+        self.debouncer.trigger()
