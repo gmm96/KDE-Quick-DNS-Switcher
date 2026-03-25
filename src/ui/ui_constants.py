@@ -12,6 +12,9 @@ class UiConstants:
     # Default description
     DEFAULT_BODY = "Default"
     # Icons from theme
-    AUTO_ICON = "auto.svg"
-    DISCONNECTED_ICON = "disconnected.svg"
-    DEFAULT_ICON = "unknown.svg"
+    AUTO_ICON = "qds-dns-auto.svg"
+    DISCONNECTED_ICON = "qds-dns-disconnected.svg"
+    DEFAULT_ICON = "qds-dns-unknown.svg"
+    # Menu
+    LEFT_MARGIN = "      "
+    SELECTED_ITEM = "  ✔ "
